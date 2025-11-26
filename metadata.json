@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Studio Legale AI CRM",
+  "description": "Un'applicazione CRM per studi legali potenziata dall'IA per gestire clienti, pratiche e generare approfondimenti utilizzando l'API Gemini. In italiano.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
