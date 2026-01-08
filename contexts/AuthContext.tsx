@@ -1,12 +1,12 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db } from '../data/db';
+import { supabase } from '../services/supabaseClient';
 import { type User } from '../types';
 
 interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
-    login: (username: string, password: string) => Promise<boolean>;
+    login: (email: string, password: string) => Promise<boolean>;
     register: (user: Omit<User, 'id' | 'role'>) => Promise<{ success: boolean; message?: string }>;
     logout: () => void;
     isLoading: boolean;
@@ -19,47 +19,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Controlla se c'è una sessione salvata (in una app reale useremmo token)
-        const storedUserId = localStorage.getItem('auth_user_id');
-        if (storedUserId) {
-            db.users.get(parseInt(storedUserId)).then(foundUser => {
-                if (foundUser) {
-                    setUser(foundUser);
-                }
-            }).finally(() => setIsLoading(false));
-        } else {
+        // Gestione della sessione persistente
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user) {
+                setUser({
+                    id: 0, // In Supabase user.id è UUID, ma la nostra app usa numbers in certi posti
+                    username: session.user.email || '',
+                    password: '',
+                    name: session.user.user_metadata?.name || 'Utente',
+                    role: session.user.user_metadata?.role || 'user'
+                });
+            }
             setIsLoading(false);
-        }
+        });
+
+        // Ascolta i cambiamenti di stato auth (login/logout)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.user) {
+                setUser({
+                    id: 0,
+                    username: session.user.email || '',
+                    password: '',
+                    name: session.user.user_metadata?.name || 'Utente',
+                    role: session.user.user_metadata?.role || 'user'
+                });
+            } else {
+                setUser(null);
+            }
+            setIsLoading(false);
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
-    const login = async (username: string, password: string): Promise<boolean> => {
-        const foundUser = await db.users.where({ username }).first();
-        if (foundUser && foundUser.password === password) {
-            setUser(foundUser);
-            localStorage.setItem('auth_user_id', foundUser.id!.toString());
-            return true;
-        }
-        return false;
+    const login = async (email: string, password: string): Promise<boolean> => {
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+        return !error;
     };
 
     const register = async (newUser: Omit<User, 'id' | 'role'>): Promise<{ success: boolean; message?: string }> => {
         try {
-            const existingUser = await db.users.where({ username: newUser.username }).first();
-            if (existingUser) {
-                return { success: false, message: 'Nome utente già in uso.' };
+            const { error } = await supabase.auth.signUp({
+                email: newUser.username, // Usiamo username come email per compatibilità Supabase
+                password: newUser.password,
+                options: {
+                    data: {
+                        name: newUser.name,
+                        role: 'user'
+                    }
+                }
+            });
+
+            if (error) {
+                return { success: false, message: error.message };
             }
-
-            const userToCreate: User = {
-                ...newUser,
-                role: 'user' // Default role
-            };
-
-            const id = await db.users.add(userToCreate);
-            
-            // Auto-login dopo la registrazione
-            const createdUser = { ...userToCreate, id: id as number };
-            setUser(createdUser);
-            localStorage.setItem('auth_user_id', id.toString());
 
             return { success: true };
         } catch (error) {
@@ -68,9 +84,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const logout = () => {
+    const logout = async () => {
+        await supabase.auth.signOut();
         setUser(null);
-        localStorage.removeItem('auth_user_id');
     };
 
     return (

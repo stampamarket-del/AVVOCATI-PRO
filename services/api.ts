@@ -1,138 +1,156 @@
 
-import { db } from '../data/db';
+import { supabase } from './supabaseClient';
 import { type Client, type Practice, type Reminder, type Document, type FirmProfile, type Lawyer, type Letter, type TimeEntry, type Quote } from '../types';
 
 /**
- * Funzione fetcher per SWR.
- * Simula una chiamata API REST recuperando i dati direttamente dal database Dexie.
- * Supporta percorsi come '/api/clients' e '/api/clients/1'.
- * Supporta query params simulati per i documenti, es. '/api/documents?clientId=1'
- * @param key La chiave dell'API da recuperare.
+ * Funzione fetcher per SWR ottimizzata per Supabase.
  */
 export const fetcher = async (key: string) => {
   const [path, params] = key.split('?');
   const queryParams = new URLSearchParams(params);
-  
-  // Rimuove il prefisso /api/ per semplificare la logica, es. "clients/1" o "firm-profile"
   const apiPath = path.startsWith('/api/') ? path.substring(5) : null;
 
   if (apiPath === null || apiPath === '') {
       throw new Error(`Formato della chiave API non valido: ${key}`);
   }
   
-  const parts = apiPath.split('/'); // es. ['clients', '1'] o ['firm-profile']
+  const parts = apiPath.split('/');
   const resource = parts[0];
   const id = parts[1] ? parseInt(parts[1], 10) : null;
-  
-  console.log(`Fetcher called with key: ${key}`, { resource, id, queryParams: Object.fromEntries(queryParams) });
 
+  let query = supabase.from(resource).select('*');
 
+  if (id) {
+    const { data, error } = await query.eq('id', id).single();
+    if (error) throw error;
+    return data;
+  }
+
+  // Filtri specifici basati sui query params
   switch (resource) {
-    case 'clients':
-      return id ? db.clients.get(id) : db.clients.toArray();
-    case 'practices':
-      return id ? db.practices.get(id) : db.practices.toArray();
-    case 'reminders':
-      return db.reminders.orderBy('dueDate').toArray();
     case 'documents':
       const clientId = queryParams.get('clientId');
-      const practiceId_doc = queryParams.get('practiceId');
-      if (practiceId_doc) {
-        return db.documents.where('practiceId').equals(parseInt(practiceId_doc, 10)).toArray();
-      }
-      if (clientId) {
-        return db.documents.where('clientId').equals(parseInt(clientId, 10)).toArray();
-      }
-      return db.documents.toArray();
-    case 'lawyers':
-      return id ? db.lawyers.get(id) : db.lawyers.toArray();
-    case 'letters':
-        return db.letters.orderBy('createdAt').reverse().toArray();
-    case 'quotes':
-        return db.quotes.orderBy('createdAt').reverse().toArray();
-    case 'firm-profile':
-      return db.firmProfile.get(1);
+      const practiceIdDoc = queryParams.get('practiceId');
+      if (practiceIdDoc) query = query.eq('practiceId', parseInt(practiceIdDoc));
+      else if (clientId) query = query.eq('clientId', parseInt(clientId));
+      break;
     case 'time-entries':
-      const practiceId_time = queryParams.get('practiceId');
-      if (practiceId_time) {
-        return db.timeEntries.where('practiceId').equals(parseInt(practiceId_time, 10)).toArray();
-      }
-      return db.timeEntries.toArray();
-    default:
-      throw new Error(`Endpoint API sconosciuto: ${key}`);
+      const practiceIdTime = queryParams.get('practiceId');
+      if (practiceIdTime) query = query.eq('practiceId', parseInt(practiceIdTime));
+      break;
+    case 'reminders':
+      query = query.order('dueDate', { ascending: true });
+      break;
+    case 'letters':
+    case 'quotes':
+      query = query.order('createdAt', { ascending: false });
+      break;
+    case 'firm-profile':
+      // Assumiamo che ci sia solo un profilo con ID 1
+      const { data: profile, error: profileError } = await supabase.from('firm_profile').select('*').eq('id', 1).single();
+      if (profileError) throw profileError;
+      return profile;
   }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
 };
 
 // --- Funzioni di Mutazione Clienti ---
-export const createClient = async (client: Omit<Client, 'id'>): Promise<number> => {
-    return await db.clients.add(client as Client);
+export const createClient = async (client: Omit<Client, 'id'>) => {
+    const { data, error } = await supabase.from('clients').insert([client]).select();
+    if (error) throw error;
+    return data[0].id;
 };
-export const updateClient = async (updatedClient: Partial<Client> & { id: number }): Promise<void> => {
-  await db.clients.update(updatedClient.id, updatedClient);
+export const updateClient = async (updatedClient: Partial<Client> & { id: number }) => {
+  const { error } = await supabase.from('clients').update(updatedClient).eq('id', updatedClient.id);
+  if (error) throw error;
 };
 
 // --- Funzioni di Mutazione Pratiche ---
-export const createPractice = async (practice: Omit<Practice, 'id'>): Promise<number> => {
-    return await db.practices.add(practice as Practice);
+export const createPractice = async (practice: Omit<Practice, 'id'>) => {
+    const { data, error } = await supabase.from('practices').insert([practice]).select();
+    if (error) throw error;
+    return data[0].id;
 };
-export const updatePractice = async (updatedPractice: Partial<Practice> & { id: number }): Promise<void> => {
-  await db.practices.update(updatedPractice.id, updatedPractice);
+export const updatePractice = async (updatedPractice: Partial<Practice> & { id: number }) => {
+  const { error } = await supabase.from('practices').update(updatedPractice).eq('id', updatedPractice.id);
+  if (error) throw error;
 };
-
 
 // --- Funzioni di Mutazione Promemoria ---
-export const createReminder = async (reminder: Omit<Reminder, 'id'>): Promise<number> => {
-    return await db.reminders.add(reminder as Reminder);
+export const createReminder = async (reminder: Omit<Reminder, 'id'>) => {
+    const { data, error } = await supabase.from('reminders').insert([reminder]).select();
+    if (error) throw error;
+    return data[0].id;
 };
-export const deleteReminder = async (id: number): Promise<void> => {
-    await db.reminders.delete(id);
+export const deleteReminder = async (id: number) => {
+    const { error } = await supabase.from('reminders').delete().eq('id', id);
+    if (error) throw error;
 };
 
 // --- Funzioni di Mutazione Documenti ---
-export const addDocument = async (doc: Omit<Document, 'id'>): Promise<number> => {
-    return await db.documents.add(doc as Document);
+export const addDocument = async (doc: Omit<Document, 'id'>) => {
+    const { data, error } = await supabase.from('documents').insert([doc]).select();
+    if (error) throw error;
+    return data[0].id;
 };
-export const deleteDocument = async (id: number): Promise<void> => {
-    await db.documents.delete(id);
+export const deleteDocument = async (id: number) => {
+    const { error } = await supabase.from('documents').delete().eq('id', id);
+    if (error) throw error;
 };
 
 // --- Funzioni di Mutazione Profilo Studio ---
-export const updateFirmProfile = async (profile: FirmProfile): Promise<void> => {
-  await db.firmProfile.put(profile);
+export const updateFirmProfile = async (profile: FirmProfile) => {
+  const { error } = await supabase.from('firm_profile').upsert(profile);
+  if (error) throw error;
 };
 
 // --- Funzioni di Mutazione Avvocati ---
-export const createLawyer = async (lawyer: Omit<Lawyer, 'id'>): Promise<number> => {
-    return await db.lawyers.add(lawyer as Lawyer);
+export const createLawyer = async (lawyer: Omit<Lawyer, 'id'>) => {
+    const { data, error } = await supabase.from('lawyers').insert([lawyer]).select();
+    if (error) throw error;
+    return data[0].id;
 };
-export const updateLawyer = async (updatedLawyer: Partial<Lawyer> & { id: number }): Promise<void> => {
-  await db.lawyers.update(updatedLawyer.id, updatedLawyer);
+export const updateLawyer = async (updatedLawyer: Partial<Lawyer> & { id: number }) => {
+  const { error } = await supabase.from('lawyers').update(updatedLawyer).eq('id', updatedLawyer.id);
+  if (error) throw error;
 };
-export const deleteLawyer = async (id: number): Promise<void> => {
-    await db.lawyers.delete(id);
+export const deleteLawyer = async (id: number) => {
+    const { error } = await supabase.from('lawyers').delete().eq('id', id);
+    if (error) throw error;
 };
 
 // --- Funzioni di Mutazione Lettere ---
-export const createLetter = async (letter: Omit<Letter, 'id'>): Promise<number> => {
-    return await db.letters.add(letter as Letter);
+export const createLetter = async (letter: Omit<Letter, 'id'>) => {
+    const { data, error } = await supabase.from('letters').insert([letter]).select();
+    if (error) throw error;
+    return data[0].id;
 };
-export const deleteLetter = async (id: number): Promise<void> => {
-    await db.letters.delete(id);
+export const deleteLetter = async (id: number) => {
+    const { error } = await supabase.from('letters').delete().eq('id', id);
+    if (error) throw error;
 };
 
 // --- Funzioni di Mutazione Preventivi ---
-export const createQuote = async (quote: Omit<Quote, 'id'>): Promise<number> => {
-    return await db.quotes.add(quote as Quote);
+export const createQuote = async (quote: Omit<Quote, 'id'>) => {
+    const { data, error } = await supabase.from('quotes').insert([quote]).select();
+    if (error) throw error;
+    return data[0].id;
 };
-
-export const deleteQuote = async (id: number): Promise<void> => {
-    await db.quotes.delete(id);
+export const deleteQuote = async (id: number) => {
+    const { error } = await supabase.from('quotes').delete().eq('id', id);
+    if (error) throw error;
 };
 
 // --- Funzioni di Mutazione Time Entries ---
-export const createTimeEntry = async (entry: Omit<TimeEntry, 'id'>): Promise<number> => {
-    return await db.timeEntries.add(entry as TimeEntry);
+export const createTimeEntry = async (entry: Omit<TimeEntry, 'id'>) => {
+    const { data, error } = await supabase.from('time_entries').insert([entry]).select();
+    if (error) throw error;
+    return data[0].id;
 };
-export const deleteTimeEntry = async (id: number): Promise<void> => {
-    await db.timeEntries.delete(id);
+export const deleteTimeEntry = async (id: number) => {
+    const { error } = await supabase.from('time_entries').delete().eq('id', id);
+    if (error) throw error;
 };
