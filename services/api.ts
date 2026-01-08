@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { type Client, type Practice, type Reminder, type Document, type FirmProfile, type Lawyer, type Letter, type TimeEntry, type Quote } from '../types';
+import { type Client, type Practice, type Reminder, type Document, type FirmProfile, type Lawyer, type Letter, type TimeEntry, type Quote, type User } from '../types';
 
 /**
  * Funzione fetcher per SWR ottimizzata per Supabase.
@@ -16,7 +16,9 @@ export const fetcher = async (key: string) => {
   
   const parts = apiPath.split('/');
   const resource = parts[0];
-  const id = parts[1] ? parseInt(parts[1], 10) : null;
+  
+  // Gestione ID per stringhe (UUID di Supabase) o numeri
+  const id = parts[1] || null;
 
   let query = supabase.from(resource).select('*');
 
@@ -46,10 +48,12 @@ export const fetcher = async (key: string) => {
       query = query.order('createdAt', { ascending: false });
       break;
     case 'firm-profile':
-      // Assumiamo che ci sia solo un profilo con ID 1
       const { data: profile, error: profileError } = await supabase.from('firm_profile').select('*').eq('id', 1).single();
       if (profileError) throw profileError;
       return profile;
+    case 'profiles':
+      query = query.order('name', { ascending: true });
+      break;
   }
 
   const { data, error } = await query;
@@ -152,5 +156,11 @@ export const createTimeEntry = async (entry: Omit<TimeEntry, 'id'>) => {
 };
 export const deleteTimeEntry = async (id: number) => {
     const { error } = await supabase.from('time_entries').delete().eq('id', id);
+    if (error) throw error;
+};
+
+// --- Funzioni di Mutazione Profili Utente ---
+export const deleteProfile = async (id: string) => {
+    const { error } = await supabase.from('profiles').delete().eq('id', id);
     if (error) throw error;
 };

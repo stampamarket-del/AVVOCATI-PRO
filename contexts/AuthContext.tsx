@@ -23,7 +23,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) {
                 setUser({
-                    id: 0, // In Supabase user.id è UUID, ma la nostra app usa numbers in certi posti
+                    id: 0, 
                     username: session.user.email || '',
                     password: '',
                     name: session.user.user_metadata?.name || 'Utente',
@@ -62,8 +62,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const register = async (newUser: Omit<User, 'id' | 'role'>): Promise<{ success: boolean; message?: string }> => {
         try {
-            const { error } = await supabase.auth.signUp({
-                email: newUser.username, // Usiamo username come email per compatibilità Supabase
+            const { data, error } = await supabase.auth.signUp({
+                email: newUser.username,
                 password: newUser.password,
                 options: {
                     data: {
@@ -75,6 +75,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (error) {
                 return { success: false, message: error.message };
+            }
+
+            // Se la registrazione ha successo, creiamo il profilo nella tabella dedicata
+            if (data.user) {
+                await supabase.from('profiles').insert([
+                    {
+                        id: data.user.id,
+                        name: newUser.name,
+                        username: newUser.username,
+                        role: 'user'
+                    }
+                ]);
             }
 
             return { success: true };
