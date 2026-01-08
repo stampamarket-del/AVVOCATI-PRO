@@ -2,107 +2,106 @@
 import { supabase } from './supabaseClient';
 import { type Client, type Practice, type Reminder, type Document, type FirmProfile, type Lawyer, type Letter, type TimeEntry, type Quote } from '../types';
 
-// --- Helper per la mappatura dei campi (JS -> DB) ---
+// --- Helper di Mappatura Rigorosa (JS -> DB) ---
+// Questi helper estraggono solo le proprietà necessarie e le rinominano in snake_case.
+// Impediscono a chiavi camelCase (come createdAt) di arrivare al server.
 
-const mapClientToDB = (c: Partial<Client>) => ({
-    name: c.name,
-    email: c.email,
-    phone: c.phone,
-    taxcode: c.taxcode,
-    notes: c.notes,
-    priority: c.priority,
-    created_at: c.createdAt
-});
+const mapClientToDB = (c: any) => {
+    const out: any = {};
+    if (c.name !== undefined) out.name = c.name;
+    if (c.email !== undefined) out.email = c.email;
+    if (c.phone !== undefined) out.phone = c.phone;
+    if (c.taxcode !== undefined) out.taxcode = c.taxcode;
+    if (c.notes !== undefined) out.notes = c.notes;
+    if (c.priority !== undefined) out.priority = c.priority;
+    if (c.createdAt !== undefined) out.created_at = c.createdAt;
+    return out;
+};
 
-const mapPracticeToDB = (p: Partial<Practice>) => ({
-    client_id: p.clientId,
-    lawyer_id: p.lawyerId,
-    title: p.title,
-    type: p.type,
-    status: p.status,
-    value: p.value,
-    fee: p.fee,
-    paid_amount: p.paidAmount,
-    priority: p.priority,
-    notes: p.notes,
-    opened_at: p.openedAt
-});
+const mapPracticeToDB = (p: any) => {
+    const out: any = {};
+    if (p.clientId !== undefined) out.client_id = p.clientId;
+    if (p.lawyerId !== undefined) out.lawyer_id = p.lawyerId;
+    if (p.title !== undefined) out.title = p.title;
+    if (p.type !== undefined) out.type = p.type;
+    if (p.status !== undefined) out.status = p.status;
+    if (p.value !== undefined) out.value = p.value;
+    if (p.fee !== undefined) out.fee = p.fee;
+    if (p.paidAmount !== undefined) out.paid_amount = p.paidAmount;
+    if (p.priority !== undefined) out.priority = p.priority;
+    if (p.notes !== undefined) out.notes = p.notes;
+    if (p.openedAt !== undefined) out.opened_at = p.openedAt;
+    return out;
+};
 
-const mapLawyerToDB = (l: Partial<Lawyer>) => ({
-    first_name: l.firstName,
-    last_name: l.lastName,
-    email: l.email,
-    phone: l.phone,
-    specialization: l.specialization,
-    photo_url: l.photoUrl,
-    billing_type: l.billingType,
-    billing_rate: l.billingRate
-});
+const mapLawyerToDB = (l: any) => {
+    const out: any = {};
+    if (l.firstName !== undefined) out.first_name = l.firstName;
+    if (l.lastName !== undefined) out.last_name = l.lastName;
+    if (l.email !== undefined) out.email = l.email;
+    if (l.phone !== undefined) out.phone = l.phone;
+    if (l.specialization !== undefined) out.specialization = l.specialization;
+    if (l.photoUrl !== undefined) out.photo_url = l.photoUrl;
+    if (l.billingType !== undefined) out.billing_type = l.billingType;
+    if (l.billingRate !== undefined) out.billing_rate = l.billingRate;
+    return out;
+};
 
-const mapDocumentToDB = (d: Partial<Document>) => ({
-    client_id: d.clientId,
-    practice_id: d.practiceId,
-    name: d.name,
-    type: d.type,
-    data_url: d.dataUrl,
-    created_at: d.createdAt
-});
+// --- Helper di Mappatura (DB -> JS) ---
 
-const mapReminderToDB = (r: Partial<Reminder>) => ({
-    practice_id: r.practiceId,
-    title: r.title,
-    due_date: r.dueDate,
-    priority: r.priority
-});
-
-// --- Helper per la mappatura dei campi (DB -> JS) ---
-
-const mapFromDB = (resource: string, data: any) => {
+const mapFromDB = (resource: string, data: any): any => {
     if (!data) return null;
     if (Array.isArray(data)) return data.map(item => mapFromDB(resource, item));
 
+    const out = { ...data };
     switch (resource) {
         case 'clients':
-            return { ...data, createdAt: data.created_at };
+            out.createdAt = data.created_at;
+            break;
         case 'practices':
-            return { 
-                ...data, 
-                clientId: data.client_id, 
-                lawyerId: data.lawyer_id, 
-                openedAt: data.opened_at,
-                paidAmount: data.paid_amount
-            };
+            out.clientId = data.client_id;
+            out.lawyerId = data.lawyer_id;
+            out.openedAt = data.opened_at;
+            out.paidAmount = data.paid_amount;
+            break;
         case 'lawyers':
-            return { 
-                ...data, 
-                firstName: data.first_name, 
-                lastName: data.last_name, 
-                photoUrl: data.photo_url,
-                billingType: data.billing_type,
-                billingRate: data.billing_rate
-            };
+            out.firstName = data.first_name;
+            out.lastName = data.last_name;
+            out.photoUrl = data.photo_url;
+            out.billingType = data.billing_type;
+            out.billingRate = data.billing_rate;
+            break;
         case 'documents':
-            return { ...data, clientId: data.client_id, practiceId: data.practice_id, dataUrl: data.data_url, createdAt: data.created_at };
+            out.clientId = data.client_id;
+            out.practiceId = data.practice_id;
+            out.dataUrl = data.data_url;
+            out.createdAt = data.created_at;
+            break;
         case 'firm_profile':
-            return { ...data, vatNumber: data.vat_number, logoUrl: data.logo_url };
+            out.vatNumber = data.vat_number;
+            out.logoUrl = data.logo_url;
+            break;
         case 'reminders':
-            return { ...data, practiceId: data.practice_id, dueDate: data.due_date };
+            out.practiceId = data.practice_id;
+            out.dueDate = data.due_date;
+            break;
         case 'letters':
-            return { ...data, clientId: data.client_id, createdAt: data.created_at };
+            out.clientId = data.client_id;
+            out.createdAt = data.created_at;
+            break;
         case 'quotes':
-            return { 
-                ...data, 
-                clientId: data.client_id, 
-                practiceTitle: data.practice_title,
-                practiceType: data.practice_type,
-                practiceNotes: data.practice_notes,
-                createdAt: data.created_at 
-            };
+            out.clientId = data.client_id;
+            out.practiceTitle = data.practice_title;
+            out.practiceType = data.practice_type;
+            out.practiceNotes = data.practice_notes;
+            out.createdAt = data.created_at;
+            break;
         case 'time_entries':
-            return { ...data, practiceId: data.practice_id, createdAt: data.created_at };
-        default:
-            return data;
+            out.practiceId = data.practice_id;
+            out.createdAt = data.created_at;
+            break;
     }
+    return out;
 };
 
 /**
@@ -127,122 +126,116 @@ export const fetcher = async (key: string) => {
     return mapFromDB(resource, data);
   }
 
-  // Filtri specifici basati sui query params
-  switch (resource) {
-    case 'documents':
-      const clientId = queryParams.get('clientId');
-      const practiceIdDoc = queryParams.get('practiceId');
-      if (practiceIdDoc) query = query.eq('practice_id', parseInt(practiceIdDoc));
-      else if (clientId) query = query.eq('client_id', parseInt(clientId));
-      break;
-    case 'time_entries':
-      const practiceIdTime = queryParams.get('practiceId');
-      if (practiceIdTime) query = query.eq('practice_id', parseInt(practiceIdTime));
-      break;
-    case 'reminders':
-      query = query.order('due_date', { ascending: true });
-      break;
-    case 'letters':
-    case 'quotes':
-      query = query.order('created_at', { ascending: false });
-      break;
-    case 'firm_profile':
-      const { data: profile, error: profileError } = await supabase.from('firm_profile').select('*').eq('id', 1).single();
-      if (profileError) throw profileError;
-      return mapFromDB('firm_profile', profile);
-  }
+  // Filtri e ordinamenti
+  if (resource === 'reminders') query = query.order('due_date', { ascending: true });
+  if (['letters', 'quotes'].includes(resource)) query = query.order('created_at', { ascending: false });
+  
+  const clientId = queryParams.get('clientId');
+  const practiceId = queryParams.get('practiceId');
+  if (practiceId) query = query.eq('practice_id', parseInt(practiceId));
+  else if (clientId) query = query.eq('client_id', parseInt(clientId));
 
   const { data, error } = await query;
   if (error) throw error;
   return mapFromDB(resource, data);
 };
 
-// --- Funzioni di Mutazione Clienti ---
+// --- Mutazioni ---
+
 export const createClient = async (client: Omit<Client, 'id'>) => {
     const dbData = mapClientToDB(client);
+    console.debug("Sending to Supabase (Client):", dbData);
     const { data, error } = await supabase.from('clients').insert([dbData]).select();
     if (error) throw error;
-    return data[0].id;
-};
-export const updateClient = async (updatedClient: Partial<Client> & { id: number }) => {
-  const dbData = mapClientToDB(updatedClient);
-  // Rimuovi campi undefined per evitare sovrascritture accidentali
-  Object.keys(dbData).forEach(key => (dbData as any)[key] === undefined && delete (dbData as any)[key]);
-  const { error } = await supabase.from('clients').update(dbData).eq('id', updatedClient.id);
-  if (error) throw error;
+    return data?.[0]?.id;
 };
 
-// --- Funzioni di Mutazione Pratiche ---
+export const updateClient = async (updatedClient: Partial<Client> & { id: number }) => {
+    const dbData = mapClientToDB(updatedClient);
+    const { error } = await supabase.from('clients').update(dbData).eq('id', updatedClient.id);
+    if (error) throw error;
+};
+
 export const createPractice = async (practice: Omit<Practice, 'id'>) => {
     const dbData = mapPracticeToDB(practice);
     const { data, error } = await supabase.from('practices').insert([dbData]).select();
     if (error) throw error;
-    return data[0].id;
-};
-export const updatePractice = async (updatedPractice: Partial<Practice> & { id: number }) => {
-  const dbData = mapPracticeToDB(updatedPractice);
-  Object.keys(dbData).forEach(key => (dbData as any)[key] === undefined && delete (dbData as any)[key]);
-  const { error } = await supabase.from('practices').update(dbData).eq('id', updatedPractice.id);
-  if (error) throw error;
+    return data?.[0]?.id;
 };
 
-// --- Funzioni di Mutazione Promemoria ---
+export const updatePractice = async (updatedPractice: Partial<Practice> & { id: number }) => {
+    const dbData = mapPracticeToDB(updatedPractice);
+    const { error } = await supabase.from('practices').update(dbData).eq('id', updatedPractice.id);
+    if (error) throw error;
+};
+
 export const createReminder = async (reminder: Omit<Reminder, 'id'>) => {
-    const dbData = mapReminderToDB(reminder);
+    const dbData = {
+        practice_id: reminder.practiceId,
+        title: reminder.title,
+        due_date: reminder.dueDate,
+        priority: reminder.priority
+    };
     const { data, error } = await supabase.from('reminders').insert([dbData]).select();
     if (error) throw error;
-    return data[0].id;
+    return data?.[0]?.id;
 };
+
 export const deleteReminder = async (id: number) => {
     const { error } = await supabase.from('reminders').delete().eq('id', id);
     if (error) throw error;
 };
 
-// --- Funzioni di Mutazione Documenti ---
 export const addDocument = async (doc: Omit<Document, 'id'>) => {
-    const dbData = mapDocumentToDB(doc);
+    const dbData = {
+        client_id: doc.clientId,
+        practice_id: doc.practiceId,
+        name: doc.name,
+        type: doc.type,
+        data_url: doc.dataUrl,
+        created_at: doc.createdAt
+    };
     const { data, error } = await supabase.from('documents').insert([dbData]).select();
     if (error) throw error;
-    return data[0].id;
+    return data?.[0]?.id;
 };
+
 export const deleteDocument = async (id: number) => {
     const { error } = await supabase.from('documents').delete().eq('id', id);
     if (error) throw error;
 };
 
-// --- Funzioni di Mutazione Profilo Studio ---
 export const updateFirmProfile = async (profile: FirmProfile) => {
-  const dbData = {
-      name: profile.name,
-      address: profile.address,
-      vat_number: profile.vatNumber,
-      email: profile.email,
-      phone: profile.phone,
-      logo_url: profile.logoUrl
-  };
-  const { error } = await supabase.from('firm_profile').upsert(dbData);
-  if (error) throw error;
+    const dbData = {
+        name: profile.name,
+        address: profile.address,
+        vat_number: profile.vatNumber,
+        email: profile.email,
+        phone: profile.phone,
+        logo_url: profile.logoUrl
+    };
+    const { error } = await supabase.from('firm_profile').upsert({ id: 1, ...dbData });
+    if (error) throw error;
 };
 
-// --- Funzioni di Mutazione Avvocati ---
 export const createLawyer = async (lawyer: Omit<Lawyer, 'id'>) => {
     const dbData = mapLawyerToDB(lawyer);
     const { data, error } = await supabase.from('lawyers').insert([dbData]).select();
     if (error) throw error;
-    return data[0].id;
+    return data?.[0]?.id;
 };
+
 export const updateLawyer = async (updatedLawyer: Partial<Lawyer> & { id: number }) => {
-  const dbData = mapLawyerToDB(updatedLawyer);
-  Object.keys(dbData).forEach(key => (dbData as any)[key] === undefined && delete (dbData as any)[key]);
-  const { error } = await supabase.from('lawyers').update(dbData).eq('id', updatedLawyer.id);
-  if (error) throw error;
+    const dbData = mapLawyerToDB(updatedLawyer);
+    const { error } = await supabase.from('lawyers').update(dbData).eq('id', updatedLawyer.id);
+    if (error) throw error;
 };
+
 export const deleteLawyer = async (id: number) => {
     const { error } = await supabase.from('lawyers').delete().eq('id', id);
     if (error) throw error;
 };
 
-// --- Funzioni di Mutazione Lettere ---
 export const createLetter = async (letter: Omit<Letter, 'id'>) => {
     const dbData = {
         client_id: letter.clientId,
@@ -252,14 +245,14 @@ export const createLetter = async (letter: Omit<Letter, 'id'>) => {
     };
     const { data, error } = await supabase.from('letters').insert([dbData]).select();
     if (error) throw error;
-    return data[0].id;
+    return data?.[0]?.id;
 };
+
 export const deleteLetter = async (id: number) => {
     const { error } = await supabase.from('letters').delete().eq('id', id);
     if (error) throw error;
 };
 
-// --- Funzioni di Mutazione Preventivi ---
 export const createQuote = async (quote: Omit<Quote, 'id'>) => {
     const dbData = {
         client_id: quote.clientId,
@@ -274,14 +267,14 @@ export const createQuote = async (quote: Omit<Quote, 'id'>) => {
     };
     const { data, error } = await supabase.from('quotes').insert([dbData]).select();
     if (error) throw error;
-    return data[0].id;
+    return data?.[0]?.id;
 };
+
 export const deleteQuote = async (id: number) => {
     const { error } = await supabase.from('quotes').delete().eq('id', id);
     if (error) throw error;
 };
 
-// --- Funzioni di Mutazione Time Entries ---
 export const createTimeEntry = async (entry: Omit<TimeEntry, 'id'>) => {
     const dbData = {
         practice_id: entry.practiceId,
@@ -291,14 +284,14 @@ export const createTimeEntry = async (entry: Omit<TimeEntry, 'id'>) => {
     };
     const { data, error } = await supabase.from('time_entries').insert([dbData]).select();
     if (error) throw error;
-    return data[0].id;
+    return data?.[0]?.id;
 };
+
 export const deleteTimeEntry = async (id: number) => {
     const { error } = await supabase.from('time_entries').delete().eq('id', id);
     if (error) throw error;
 };
 
-// --- Funzioni di Mutazione Profili Utente ---
 export const deleteProfile = async (id: string) => {
     const { error } = await supabase.from('profiles').delete().eq('id', id);
     if (error) throw error;

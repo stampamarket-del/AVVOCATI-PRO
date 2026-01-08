@@ -52,16 +52,22 @@ const ClientForm: React.FC<ClientFormProps> = ({ client, onClose }) => {
                     name: formData.name || 'Senza nome',
                     email: formData.email || '',
                     phone: formData.phone || '',
-                    taxcode: formData.taxcode || '',
+                    taxcode: (formData.taxcode || '').toUpperCase().trim(),
                     priority: formData.priority || 'Media',
                     createdAt: new Date().toISOString(),
                 });
             }
             await mutate('/api/clients');
             onClose();
-        } catch (err) {
-            console.error(err);
-            setError('Si è verificato un errore durante il salvataggio.');
+        } catch (err: any) {
+            console.error("Save Client Error:", err);
+            if (err.code === '23505') {
+                setError('Errore: Un cliente con questo Codice Fiscale è già presente nel database.');
+            } else if (err.status === 403 || err.status === 401) {
+                setError('Errore di sessione: Per favore, prova a disconnetterti e rientrare.');
+            } else {
+                setError(err.message || 'Si è verificato un errore durante il salvataggio.');
+            }
         } finally {
             setIsLoading(false);
         }
@@ -102,7 +108,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ client, onClose }) => {
                         <textarea id="notes" name="notes" value={formData.notes} onChange={handleChange} rows={3} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"></textarea>
                     </div>
 
-                    {error && <p className="text-red-500 text-sm">{error}</p>}
+                    {error && <p className="text-red-500 text-sm font-medium p-2 bg-red-50 rounded">{error}</p>}
                     
                     <div className="flex justify-end gap-4 pt-4">
                         <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Annulla</button>
